@@ -150,7 +150,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             !newStop -> ""
             mode == FamilyMode.AUTO -> " 등록된 가족에게도 상황을 알립니다."
             else -> " 화면의 버튼을 누르면 가족에게도 알릴 수 있습니다."
-        }
+        } + if (severity == Severity.STOP_NOW && onHighway()) " 고속도로에서는 ${ai.pleos.warninglight.navi.Emergency.HIGHWAY_SAFETY} 한국도로공사 긴급견인은 1588-2504입니다." else ""
         say(buildAnnouncement(top, escalated, sorted.size) + tail)
         if (newStop && mode == FamilyMode.AUTO) requestFamilySend()
     }
@@ -227,6 +227,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         navigator.currentLocation { loc -> _ui.update { it.copy(location = loc) } }
         _ui.update { it.copy(showEmergency = true, emergencySince = it.top?.since) }
     }
+
+    fun onHighway(): Boolean = ai.pleos.warninglight.navi.Emergency.isHighway(_ui.value.location?.address ?: navigator.lastKnown().address)
 
     fun closeEmergency() = _ui.update { it.copy(showEmergency = false) }
 

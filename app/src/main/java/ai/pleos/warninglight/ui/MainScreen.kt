@@ -357,15 +357,34 @@ private fun EmergencyScreen(vm: MainViewModel, state: UiState) {
             }
         }
         Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Emergency.PHONE}"))) },
-            modifier = Modifier.fillMaxWidth().height(120.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Palette.red, contentColor = Color.White),
-        ) {
-            Text("${Emergency.LABEL} ${Emergency.PHONE} 전화 걸기", fontSize = 38.sp, fontWeight = FontWeight.Bold)
+        val highway = vm.onHighway()
+        if (highway) {
+            Text(Emergency.HIGHWAY_SAFETY, color = Palette.amber, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
         }
-    }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            val calls = listOf(
+                Triple("${Emergency.HIGHWAY_LABEL} ${Emergency.HIGHWAY_PHONE}", "고속도로 고장 시 안전지대까지 무료 견인", Emergency.HIGHWAY_PHONE),
+                Triple("${Emergency.LABEL} ${Emergency.PHONE}", "보험·제조사 긴급출동", Emergency.PHONE),
+            ).let { if (highway) it else it.reversed() }
+            calls.forEachIndexed { i, (label, sub, phone) ->
+                Button(
+                    onClick = { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))) },
+                    modifier = Modifier.weight(1f).height(130.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (i == 0) Palette.red else Palette.surface2,
+                        contentColor = Color.White,
+                    ),
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(label, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                        Text(sub, fontSize = 20.sp)
+                    }
+                }
+            }
+        }
+}
 }
 
 @Composable

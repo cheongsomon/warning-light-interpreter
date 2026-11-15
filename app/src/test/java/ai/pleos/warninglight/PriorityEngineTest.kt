@@ -45,3 +45,11 @@ class PriorityEngineTest {
         assertEquals(Origin.SIMULATION, hub.active.value.getValue(WarningId.ENGINE).origin)
     }
 }
+
+class EmergencyTest {
+    @Test fun `주소로 고속도로 여부 추정`() {
+        org.junit.Assert.assertTrue(ai.pleos.warninglight.navi.Emergency.isHighway("경부고속도로 서울방향 판교JC 부근"))
+        org.junit.Assert.assertFalse(ai.pleos.warninglight.navi.Emergency.isHighway("수정구 시흥동"))
+        org.junit.Assert.assertFalse(ai.pleos.warninglight.navi.Emergency.isHighway(null))
+    }
+}

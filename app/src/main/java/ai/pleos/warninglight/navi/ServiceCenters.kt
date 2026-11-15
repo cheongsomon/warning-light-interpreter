@@ -48,8 +48,17 @@ object ServiceCenters {
     }
 }
 
-/** 긴급출동 연락처. TODO(사용자 확인): 실제 번호 확인 후 확정. */
+/** 긴급 연락처. */
 object Emergency {
     const val PHONE = "080-600-6000"
     const val LABEL = "현대자동차 긴급출동"
+
+    /** 고속도로 고장·사고 시 가까운 안전지대까지 무료 긴급견인 (24시간). */
+    const val HIGHWAY_PHONE = "1588-2504"
+    const val HIGHWAY_LABEL = "한국도로공사 긴급견인"
+    const val HIGHWAY_SAFETY = "비상등을 켜고 가드레일 밖 안전한 곳으로 먼저 대피한 뒤 전화하세요."
+
+    /** 주소로 고속도로 여부를 추정한다 (NaviHelper에 도로 종류 정보가 없음). */
+    fun isHighway(address: String?): Boolean =
+        address != null && (address.contains("고속도로") || address.contains("고속국도"))
 }

@@ -40,22 +40,15 @@ def build(wav_path, log_path, video_start, duration, out_path):
     bps = rate * frame
     rows = [tuple(map(float, l.split(","))) for l in open(log_path) if l.strip()]
 
-    # 크기 증가 구간을 '조각'으로 묶는다 (0.3초 이상 증가가 없으면 새 조각).
-    segments = []  # (도착 시각, 시작 바이트, 끝 바이트)
+    # 기록 주기(0.05초)마다 새로 쓰인 바이트를 '조각'으로 본다.
+    # 각 조각은 '도착 시각 - 조각 길이'에 놓아, 녹음이 건너뛴 구간이 있어도 뒤로 갈수록 밀리지 않게 한다.
+    segments = []
     prev_t, prev_s = rows[0]
-    cur = None
     for t, s in rows[1:]:
         if s > prev_s:
-            if cur and prev_t - cur["last"] <= 0.3:
-                cur["end"] = s
-                cur["last"] = t
-            else:
-                if cur:
-                    segments.append(cur)
-                cur = {"t": prev_t, "start": prev_s, "end": s, "last": t}
+            dur = (s - prev_s) / bps
+            segments.append({"t": t - dur, "start": prev_s, "end": s})
         prev_t, prev_s = t, s
-    if cur:
-        segments.append(cur)
 
     total = int(duration * rate) * frame
     out = bytearray(total)
@@ -74,7 +67,7 @@ def build(wav_path, log_path, video_start, duration, out_path):
         end = min(pos + len(chunk), total)
         out[pos:end] = chunk[: end - pos]
         cursor = end
-        print(f"조각 {seg['t'] - video_start:7.2f}s  길이 {len(chunk) / bps:5.2f}s")
+    print(f"조각 {len(segments)}개, 마지막 끝 {cursor / bps:6.2f}s")
 
     with wave.open(out_path, "wb") as w:
         w.setnchannels(ch)
