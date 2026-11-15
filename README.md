@@ -5,11 +5,23 @@
 > 정비소 길안내·긴급출동까지 이어주는 Pleos Connect 인포테인먼트 앱입니다.
 
 📺 **데모 영상 (102초, 앱 음성 포함)**: [warning-light-interpreter-demo.mp4](https://github.com/cheongsomon/warning-light-interpreter/releases/download/v0.1.0/warning-light-interpreter-demo.mp4) — Pleos Connect Emulator 화면 녹화. 앱이 실제로 낸 Pleos TTS 음성이 들어 있고, 같은 문장이 화면 하단 자막으로도 표시됩니다.  
-📦 **APK**: [Releases](../../releases)
+📦 **APK**: [`apk/cheongsomon_경고등통역사_release.apk`](apk/cheongsomon_경고등통역사_release.apk) (release 빌드) · [Releases](../../releases)
 
 ---
 
 > **핵심 목표** — 경고등이 켜진 순간, 운전자가 화면을 보지 않고도 몇 초 안에 *"계속 달려도 되는지, 지금 무엇을 해야 하는지"* 판단하게 돕는다. 모든 기능은 **해석 → 판단 → 행동** 3단계를 위해 존재한다.
+
+## 0. 테스트 환경 (공모전 제출 기준)
+
+| 항목 | 내용 |
+|---|---|
+| 앱 | 경고등 통역사 — 경고등이 켜진 순간 의미와 주행 지속 여부를 음성으로 안내하고 정비소 길안내·긴급출동으로 연결 |
+| 에뮬레이터 | **Pleos Connect Emulator v2.1.0** (`release_connect_v2.1.0`, Android 14 / API 34, Automotive, arm64) |
+| 화면 규격 | **2560 × 1440, mdpi(160dpi), 가로** — Pleos 기본 분할 화면의 앱 영역에서 동작 확인 |
+| 개발·검증 PC | Apple Silicon Mac (M4), JDK 17, Android SDK 35 |
+| 필요한 설정 | AVD Boot option = **Cold boot**, RAM 4GB. 에뮬레이터 2.1.0은 CRN 불필요. TTS 서버 합성을 쓰려면 `local.properties`에 Client ID/Secret (없으면 온디바이스 음성) |
+| APK | [`apk/cheongsomon_경고등통역사_release.apk`](apk/cheongsomon_경고등통역사_release.apk) — 비밀값이 제외된 release 빌드 |
+| 실행 | `adb install -r -g apk/cheongsomon_경고등통역사_release.apk` 후 런처에서 "경고등 통역사" 실행. 화면 오른쪽 시뮬레이션 패널로 경고를 발생시켜 시연 |
 
 ## 1. 문제 정의
 
