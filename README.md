@@ -62,18 +62,29 @@ flowchart LR
 
 ## 5. 실제 SDK 연동 범위 vs 시뮬레이션 범위
 
-<!-- 에뮬레이터 검증 결과로 갱신 -->
-| 기능 | 구현 | Pleos Connect Emulator 2.1.0 검증 결과 |
+검증 환경: Pleos Connect Emulator v2.1.0 (`release_connect_v2.1.0`), Apple M4 Mac
+
+| 기능 | 구현 | 에뮬레이터 검증 결과 |
 |---|---|---|
-| 경고등 수신 (Safety Telltales) | Vehicle SDK 실연동 | 확인 예정 |
-| 브레이크액·엔진오일·워셔액 상태 | Vehicle SDK 실연동 | 확인 예정 |
-| 남은 주행가능거리 / VIN | Vehicle SDK 실연동 | 확인 예정 |
-| 데모 시나리오의 경고 발생 | 시뮬레이션 패널 (`SIM` 표시) | 데모 영상은 시뮬레이션 입력 사용 |
-| 음성 안내 | Pleos TTS (실패 시 Android TTS 자동 대체) | 확인 예정 |
-| 정비소 길안내 | NaviHelper `requestRoute` 실연동 | 확인 예정 |
-| 정비소 목록 | **데모용 고정 데이터** (판교·분당 4곳) | 실서비스 시 정비망 API 연동 |
+| 경고등 수신 (Safety Telltales) | Vehicle SDK 실연동 | ✅ capability 확인·조회·구독 성공, 콜백 수신. ⚠️ 에뮬레이터가 경고등 목록을 **빈 값**으로 제공하고 user 빌드라 VHAL 주입 불가 → 실제 경고등 점등 입력은 실차/devbox에서 검증 필요 |
+| 브레이크액·엔진오일·워셔액 상태 | Vehicle SDK 실연동 | ⚠️ 에뮬레이터에서 `ERROR_NOT_SUPPORTED_PROPERTY` → 기능 자동 비활성화 (앱은 정상 동작) |
+| 남은 주행가능거리 | Vehicle SDK 실연동 | 연료 부족 경고 시 조회 |
+| 차량 정보(VIN) | Vehicle SDK 실연동 | ⚠️ 에뮬레이터가 `"invalid"` 반환 → "확인 불가"로 표시 |
+| **데모 영상의 경고 발생** | **시뮬레이션 패널** (`SIM` 표시) | 위 제약 때문에 데모는 시뮬레이션 입력 사용 |
+| 음성 안내 | Pleos TTS HYBRID + `registerApp` | ✅ 서버 연결 성공, 한국어 음성(서버 합성) 재생 |
+| 현재 위치 | NaviHelper `getCurrentLocationInfo` | ✅ 에뮬레이터 위치(성남시 수정구) 수신 |
+| 정비소 길안내 | NaviHelper `requestRoute` | ✅ 내비게이션 경로 안내 시작 확인 |
+| 정비소 목록 | **데모용 고정 데이터** (판교·분당 4곳, 이름에 "(데모)" 표기) | 실서비스 시 정비망 API 연동 |
 | 긴급출동 호출 | 다이얼러 열기(`ACTION_DIAL`)까지 | 실서비스 시 긴급출동 시스템 연동 |
 | 경고 문구 | 일반적인 매뉴얼 권고 기반 초안 | 실서비스 시 차종별 매뉴얼로 확정 |
+
+> 경고 입력 경로는 실제 SDK 신호와 시뮬레이션이 같은 `WarningHub`로 들어가므로, 실차에서 경고등 신호가 들어오면 화면 표시만 `SIM` → `차량 신호`로 바뀌고 이후 흐름(우선순위·음성·길안내)은 동일합니다.
+
+### 에뮬레이터 실행 팁 (macOS)
+에뮬레이터 37.x가 부팅 직후 hang detector로 종료되는 경우, 크래시 리포트를 끄고 실행하면 정상 동작했습니다.
+```bash
+ANDROID_EMU_ENABLE_CRASH_REPORTING=0 emulator -avd <AVD 이름> -no-snapshot-load
+```
 
 ## 6. 빌드·실행
 
