@@ -55,11 +55,23 @@ import java.util.Locale
 @Composable
 fun MainScreen(vm: MainViewModel, state: UiState) {
     var showSim by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    // 가족 알림 발송 요청이 오면 차량 문자 앱(발송 확인 팝업)을 내용이 채워진 상태로 연다.
+    androidx.compose.runtime.LaunchedEffect(state.familySendRequest) {
+        val body = state.familySendRequest ?: return@LaunchedEffect
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${state.familyPhone}")).putExtra("sms_body", body)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+        vm.familySendHandled()
+    }
 
     Box(Modifier.fillMaxSize().background(Palette.bg)) {
         Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                TopBar(state, showSim) { showSim = !showSim }
+                TopBar(state, showSim, onOpenLog = vm::openLog, onOpenFamily = vm::openFamily) { showSim = !showSim }
                 Spacer(Modifier.height(20.dp))
                 Box(Modifier.weight(1f)) {
                     val top = state.top
@@ -87,11 +99,13 @@ fun MainScreen(vm: MainViewModel, state: UiState) {
             if (showSim) SimulationPanel(vm, state, Modifier.width(500.dp).fillMaxHeight())
         }
         if (state.showEmergency) EmergencyScreen(vm, state)
+        if (state.showLog) BlackBoxScreen(vm, state)
+        if (state.showFamily) FamilyScreen(vm, state)
     }
 }
 
 @Composable
-private fun TopBar(state: UiState, showSim: Boolean, onToggleSim: () -> Unit) {
+private fun TopBar(state: UiState, showSim: Boolean, onOpenLog: () -> Unit, onOpenFamily: () -> Unit, onToggleSim: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Text("경고등 통역사", color = Palette.text, fontSize = 34.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.width(24.dp))
@@ -102,8 +116,16 @@ private fun TopBar(state: UiState, showSim: Boolean, onToggleSim: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Chip("음성: ${state.voiceEngine}", Palette.textDim)
         Spacer(Modifier.weight(1f))
+        OutlinedButton(onClick = onOpenFamily) {
+            Text(if (state.familyPhone.isBlank()) "가족 연락처" else "가족: ${state.familyName.ifBlank { state.familyPhone }}", fontSize = 18.sp, color = Palette.text)
+        }
+        Spacer(Modifier.width(10.dp))
+        OutlinedButton(onClick = onOpenLog) {
+            Text("경고 블랙박스", fontSize = 18.sp, color = Palette.text)
+        }
+        Spacer(Modifier.width(10.dp))
         OutlinedButton(onClick = onToggleSim) {
-            Text(if (showSim) "시뮬레이션 패널 닫기" else "시뮬레이션 패널", fontSize = 18.sp, color = Palette.textDim)
+            Text(if (showSim) "패널 닫기" else "시뮬레이션", fontSize = 18.sp, color = Palette.textDim)
         }
     }
 }
@@ -177,6 +199,12 @@ private fun WarningCard(vm: MainViewModel, w: ActiveWarning, state: UiState) {
                 NextAction.SERVICE_CENTER -> BigButton("가까운 블루핸즈 길안내", Palette.amber, Color(0xFF1A1300), Modifier.weight(1f), vm::findNearestAndRoute)
                 NextAction.GAS_STATION -> BigButton("가까운 주유소 길안내", Palette.blue, Color.White, Modifier.weight(1f), vm::findNearestGasStation)
                 NextAction.NONE -> BigButton("다시 듣기", Palette.blue, Color.White, Modifier.weight(1f), vm::repeatCurrent)
+            }
+            if (severity == Severity.STOP_NOW && state.familyMode == ai.pleos.warninglight.FamilyMode.ASK && vm.familyReady()) {
+                Spacer(Modifier.width(20.dp))
+                OutlinedButton(onClick = vm::requestFamilySend, modifier = Modifier.height(96.dp)) {
+                    Text(if (state.familySentAt != null) "가족 알림 다시" else "가족에게 알리기", fontSize = 26.sp, color = Palette.text)
+                }
             }
             if (info.nextActionFor(w.state) != NextAction.NONE) {
                 Spacer(Modifier.width(20.dp))
@@ -306,6 +334,29 @@ private fun EmergencyScreen(vm: MainViewModel, state: UiState) {
             }
         }
         Spacer(Modifier.height(24.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Palette.surface).padding(horizontal = 28.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val fam = state.familyName.ifBlank { state.familyPhone }
+            Text(
+                when {
+                    state.familyPhone.isBlank() -> "가족 알림: 등록된 연락처 없음"
+                    state.familySentAt != null -> "가족 알림: $fam · ${timeOf(state.familySentAt)} 전송 요청됨"
+                    else -> "가족 알림: $fam (아직 보내지 않음)"
+                },
+                color = if (state.familySentAt != null) Palette.green else Palette.text, fontSize = 28.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            if (state.familyPhone.isBlank()) {
+                OutlinedButton(onClick = vm::openFamily, modifier = Modifier.height(72.dp)) { Text("연락처 등록", fontSize = 24.sp, color = Palette.text) }
+            } else {
+                OutlinedButton(onClick = vm::requestFamilySend, modifier = Modifier.height(72.dp)) {
+                    Text(if (state.familySentAt != null) "다시 보내기" else "지금 보내기", fontSize = 24.sp, color = Palette.text)
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
         Button(
             onClick = { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Emergency.PHONE}"))) },
             modifier = Modifier.fillMaxWidth().height(120.dp),

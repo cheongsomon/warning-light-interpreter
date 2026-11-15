@@ -24,6 +24,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/** 즉시 정차 경고 시 가족 알림 방식 (앱 설정). */
+enum class FamilyMode(val label: String) {
+    ASK("확인 후 전송"),
+    AUTO("자동 전송"),
+    OFF("사용 안 함"),
+}
+
 data class UiState(
     val warnings: List<ActiveWarning> = emptyList(),
     val vehicle: VehicleSdkWarningSource.Status = VehicleSdkWarningSource.Status(),
@@ -35,6 +42,18 @@ data class UiState(
     val message: String? = null,
     /** 지금 음성으로 읽고 있는 문장 (화면 자막). */
     val caption: String? = null,
+    val showLog: Boolean = false,
+    /** 블랙박스 기록이 바뀔 때마다 증가 (화면 갱신용). */
+    val logVersion: Int = 0,
+    val showFamily: Boolean = false,
+    val familyName: String = "",
+    val familyPhone: String = "",
+    /** 즉시 정차 경고 시 가족 알림 방식. */
+    val familyMode: FamilyMode = FamilyMode.ASK,
+    /** 화면이 처리해야 할 가족 알림 발송 요청 (한 번 처리 후 null). */
+    val familySendRequest: String? = null,
+    /** 마지막 가족 알림 요청 시각. */
+    val familySentAt: Long? = null,
     val showEmergency: Boolean = false,
     val emergencySince: Long? = null,
 ) {
@@ -49,7 +68,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val navigator = Navigator(app)
     private val announcer = Announcer(app) { engine -> _ui.update { it.copy(voiceEngine = engine) } }
 
-    private val _ui = MutableStateFlow(UiState())
+    val warningLog = ai.pleos.warninglight.data.WarningLog(app)
+    private val prefs = app.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+    private var prevActive: Map<WarningId, ActiveWarning> = emptyMap()
+
+    private val _ui = MutableStateFlow(
+        UiState(
+            familyName = prefs.getString("familyName", "") ?: "",
+            familyPhone = prefs.getString("familyPhone", "") ?: "",
+            familyMode = runCatching { FamilyMode.valueOf(prefs.getString("familyMode", "ASK")!!) }.getOrDefault(FamilyMode.ASK),
+        )
+    )
     val ui: StateFlow<UiState> = _ui.asStateFlow()
 
     private var lastAnnouncedKey: String? = null
@@ -69,7 +98,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             hub.active.collect { map ->
                 val sorted = PriorityEngine.sorted(map.values)
-                _ui.update { it.copy(warnings = sorted) }
+                warningLog.record(prevActive, map)
+                prevActive = map
+                _ui.update { it.copy(warnings = sorted, logVersion = it.logVersion + 1) }
                 if (map.containsKey(WarningId.LOW_FUEL)) vehicleSource.refreshRange()
                 if (briefingDone) onTopChanged(sorted)
             }
@@ -113,7 +144,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val severity = PriorityEngine.severityOf(top)
         val escalated = lastAnnouncedSeverity != null && severity.rank > lastAnnouncedSeverity!!.rank
         markAnnounced(top)
-        say(buildAnnouncement(top, escalated, sorted.size))
+        val newStop = severity == Severity.STOP_NOW && escalatedToStop(top) && familyReady()
+        val mode = _ui.value.familyMode
+        val tail = when {
+            !newStop -> ""
+            mode == FamilyMode.AUTO -> " 등록된 가족에게도 상황을 알립니다."
+            else -> " 화면의 버튼을 누르면 가족에게도 알릴 수 있습니다."
+        }
+        say(buildAnnouncement(top, escalated, sorted.size) + tail)
+        if (newStop && mode == FamilyMode.AUTO) requestFamilySend()
     }
 
     private var captionJob: kotlinx.coroutines.Job? = null
@@ -192,6 +231,76 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun closeEmergency() = _ui.update { it.copy(showEmergency = false) }
 
     fun dismissMessage() = _ui.update { it.copy(message = null) }
+
+    // ---------------- 경고 블랙박스 ----------------
+
+    fun openLog() = _ui.update { it.copy(showLog = true) }
+    fun closeLog() = _ui.update { it.copy(showLog = false) }
+    fun clearLog() {
+        warningLog.clear()
+        _ui.update { it.copy(logVersion = it.logVersion + 1) }
+    }
+
+    // ---------------- 가족에게 알리기 ----------------
+
+    fun openFamily() {
+        navigator.currentLocation { loc -> _ui.update { it.copy(location = loc) } }
+        _ui.update { it.copy(showFamily = true) }
+    }
+
+    fun closeFamily() = _ui.update { it.copy(showFamily = false) }
+
+    fun saveFamily(name: String, phone: String, mode: FamilyMode) {
+        prefs.edit().putString("familyName", name.trim()).putString("familyPhone", phone.trim()).putString("familyMode", mode.name).apply()
+        _ui.update { it.copy(familyName = name.trim(), familyPhone = phone.trim(), familyMode = mode) }
+    }
+
+    /** 가족 알림을 쓸 수 있는 상태 (연락처 등록 + 사용 안 함이 아님). */
+    fun familyReady() = _ui.value.familyMode != FamilyMode.OFF && _ui.value.familyPhone.isNotBlank()
+
+    /** 같은 즉시 정차 상황에서 중복 발송하지 않도록, 직전 대표 경고가 즉시 정차가 아니었을 때만 자동 발송. */
+    private var lastStopKey: String? = null
+    private fun escalatedToStop(top: ActiveWarning): Boolean {
+        val key = "${top.id}:${top.since}"
+        if (key == lastStopKey) return false
+        lastStopKey = key
+        return true
+    }
+
+    /** 가족 알림 발송 요청. 실제 발송 화면(문자 앱) 호출은 UI가 처리한다. */
+    fun requestFamilySend() {
+        navigator.currentLocation { loc ->
+            _ui.update { it.copy(location = loc) }
+            _ui.update { it.copy(familySendRequest = familyMessage(), familySentAt = System.currentTimeMillis()) }
+        }
+    }
+
+    fun familySendHandled() = _ui.update { it.copy(familySendRequest = null) }
+
+    /** 가족에게 보낼 문자 내용: 켜진 경고 전부(심각도·영향 기능), 안내, 위치. */
+    fun familyMessage(): String {
+        val s = _ui.value
+        val fmt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.KOREA)
+        val sb = StringBuilder()
+        if (s.warnings.isEmpty()) {
+            sb.append("[경고등 통역사] 현재 확인이 필요한 차량 경고는 없습니다.")
+        } else {
+            val top = s.warnings.first()
+            sb.append("[경고등 통역사] ${fmt.format(java.util.Date(top.since))} 차량 경고 ${s.warnings.size}건\n")
+            s.warnings.forEach { w ->
+                val info = WarningCatalog[w.id]
+                sb.append("- ${displayName(w)}: ${PriorityEngine.severityOf(w).verdict}")
+                if (info.affected.isNotEmpty()) sb.append(" (영향: ${info.affected.joinToString(", ")})")
+                sb.append("\n")
+            }
+            sb.append("안내: ${WarningCatalog[top.id].actionFor(top.state)}")
+        }
+        s.location?.let { loc ->
+            sb.append("\n위치: ").append(loc.address ?: "현재 위치")
+            sb.append("\nhttps://map.kakao.com/link/map/차량위치,${"%.5f".format(loc.lat)},${"%.5f".format(loc.lon)}")
+        }
+        return sb.toString()
+    }
 
     // ---------------- 시뮬레이션 ----------------
 

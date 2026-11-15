@@ -15,9 +15,13 @@ tap() { "$ADB" shell input tap "$1" "$2"; }
 
 # 화면에서 글자를 찾아 그 가운데를 누른다 (자막 표시로 버튼 위치가 바뀌므로).
 tap_text() {
-  "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  local b
-  b=$("$ADB" shell cat /sdcard/ui.xml | grep -oE "text=\"$1\"[^>]*bounds=\"\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]\"" | grep -oE '\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]' | head -1)
+  local b="" i
+  for i in 1 2 3 4 5; do
+    "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+    b=$("$ADB" shell cat /sdcard/ui.xml | grep -oE "text=\"$1\"[^>]*bounds=\"\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]\"" | grep -oE '\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]' | head -1)
+    [ -n "$b" ] && break
+    sleep 0.5
+  done
   if [ -z "$b" ]; then echo "찾지 못함: $1"; return 1; fi
   local x1 y1 x2 y2
   read -r x1 y1 x2 y2 <<<"$(echo "$b" | sed 's/\]\[/,/' | tr -d '[]' | tr ',' ' ')"
@@ -26,11 +30,20 @@ tap_text() {
 
 echo "== 초기화"
 "$ADB" shell am force-stop $PKG
+# 블랙박스 기록 초기화 (Android Automotive는 앱이 user 10에서 실행)
+"$ADB" shell run-as $PKG --user 10 rm -f files/warning_log.json 2>/dev/null
 "$ADB" logcat -c
 sleep 1
 
+# 음성 녹음 (선택): 에뮬레이터를 QEMU_AUDIO_DRV=wav QEMU_WAV_PATH=<경로> 로 실행했다면 EMU_WAV=<경로> 지정
+if [ -n "${EMU_WAV:-}" ]; then
+  python3 "$(dirname "$0")/wav_tracker.py" track "$EMU_WAV" "${OUT%.*}-wavlog.csv" &
+  TRACKER=$!
+fi
+
 echo "== 녹화 시작"
 "$ADB" emu screenrecord start --time-limit 170 "$OUT" >/dev/null
+python3 -c "import time;print(time.time())" > "${OUT%.*}-start.txt"
 sleep 1
 
 echo "0) 앱 실행 → 시동 브리핑"
@@ -65,8 +78,15 @@ sleep 3
 tap $X_BLINK $ROW_Y_ENGINE
 sleep 15
 
+echo "7) 경고 블랙박스 (정비소에 보여줄 시간순 기록)"
+tap_text "경고 블랙박스"
+sleep 8
+tap_text "닫기"
+sleep 2
+
 echo "== 녹화 종료"
 "$ADB" emu screenrecord stop >/dev/null
 sleep 3
+[ -n "${TRACKER:-}" ] && kill "$TRACKER"
 "$ADB" logcat -d -s Speech:I > "${OUT%.*}-speech.log"
 echo "완료: $OUT"
