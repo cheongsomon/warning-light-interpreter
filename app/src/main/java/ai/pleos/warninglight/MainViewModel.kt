@@ -130,6 +130,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (escalated) sb.append("더 위급한 경고가 켜졌습니다. ")
         sb.append("${displayName(w)}입니다. ")
         sb.append(info.meaning).append(' ')
+        if (info.affected.isNotEmpty()) {
+            sb.append("${info.affected.joinToString(", ") { it.substringBefore(" (").substringBefore("(") }}에 영향이 있을 수 있습니다. ")
+        }
         sb.append(verdictSentence(w)).append(' ')
         sb.append(info.actionFor(w.state))
         if (w.id == WarningId.LOW_FUEL) {

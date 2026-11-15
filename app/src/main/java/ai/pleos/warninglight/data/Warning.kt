@@ -53,6 +53,8 @@ data class WarningInfo(
     val blinkSeverity: Severity? = null,
     val action: String,
     val blinkAction: String? = null,
+    /** 이 경고가 켜졌을 때 제대로 동작하지 않을 수 있는 기능 (매뉴얼 기준, 짧은 명사구). */
+    val affected: List<String> = emptyList(),
 ) {
     fun severityFor(state: LampState): Severity =
         if (state == LampState.BLINK) blinkSeverity ?: severity else severity

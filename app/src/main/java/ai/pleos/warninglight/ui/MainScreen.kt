@@ -142,6 +142,20 @@ private fun WarningCard(vm: MainViewModel, w: ActiveWarning, state: UiState) {
             Text(vm.displayName(w), color = Palette.text, fontSize = 44.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             Text(info.meaning, color = Palette.textDim, fontSize = 28.sp, lineHeight = 38.sp)
+            if (info.affected.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                Text("영향을 받을 수 있는 기능", color = Palette.textDim, fontSize = 22.sp)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    info.affected.forEach { f ->
+                        Text(
+                            f, color = color, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.border(2.dp, color, RoundedCornerShape(12.dp))
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(24.dp))
             Text(info.actionFor(w.state), color = Palette.text, fontSize = 32.sp, fontWeight = FontWeight.SemiBold, lineHeight = 44.sp)
             if (w.id == ai.pleos.warninglight.data.WarningId.LOW_FUEL) {
