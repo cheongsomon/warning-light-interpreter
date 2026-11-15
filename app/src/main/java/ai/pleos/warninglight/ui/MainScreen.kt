@@ -70,6 +70,10 @@ fun MainScreen(vm: MainViewModel, state: UiState) {
                     Spacer(Modifier.height(16.dp))
                     OtherWarnings(vm, state.warnings.drop(1))
                 }
+                state.caption?.let {
+                    Spacer(Modifier.height(16.dp))
+                    CaptionBar(it)
+                }
                 state.message?.let {
                     Spacer(Modifier.height(16.dp))
                     MessageBar(it, vm::dismissMessage)
@@ -219,6 +223,19 @@ private fun OtherWarnings(vm: MainViewModel, rest: List<ActiveWarning>) {
             }
         }
         if (rest.size > 4) Text("외 ${rest.size - 4}건", color = Palette.textDim, fontSize = 22.sp)
+    }
+}
+
+@Composable
+private fun CaptionBar(text: String) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0B2A4A))
+            .border(2.dp, Palette.blue, RoundedCornerShape(16.dp)).padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("음성 안내", color = Palette.blue, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(16.dp))
+        Text(text, color = Palette.text, fontSize = 24.sp, lineHeight = 32.sp, modifier = Modifier.weight(1f))
     }
 }
 

@@ -4,7 +4,7 @@
 > 경고가 켜진 순간 그 의미와 주행 지속 여부(제조사 매뉴얼 기준)를 음성으로 알려주고
 > 정비소 길안내·긴급출동까지 이어주는 Pleos Connect 인포테인먼트 앱입니다.
 
-📺 **데모 영상**: (링크 예정)  
+📺 **데모 영상 (88초)**: [warning-light-interpreter-demo.mp4](https://github.com/cheongsomon/warning-light-interpreter/releases/download/v0.1.0/warning-light-interpreter-demo.mp4) — Pleos Connect Emulator 화면 녹화. 앱 음성은 화면 하단 "음성 안내" 자막으로 확인할 수 있습니다.  
 📦 **APK**: [Releases](../../releases)
 
 ---
@@ -47,6 +47,8 @@ flowchart LR
 | 충전 경고 | 배터리 충전, 에어컨·열선 등 전기 장치, 시동 유지 |
 | 에어백 경고 | 사고 시 에어백 전개, 안전벨트 프리텐셔너 |
 | 타이어 공기압 경고 | 타이어 공기압 감시, 제동·코너링 안정성 |
+
+앱이 읽는 문장은 화면 하단 **음성 안내 자막**에도 그대로 표시합니다 (소음 환경·청각 보조).
 
 시동(앱 시작) 시에는 **차량 상태 브리핑**으로 현재 켜진 경고를 한 문장으로 요약합니다.
 
@@ -122,6 +124,8 @@ pleos.clientSecret=<Client Secret>
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ./gradlew :app:testDebugUnitTest   # 우선순위 엔진 단위 테스트
+./gradlew :app:assembleRelease -PpublicBuild   # 비밀값 없는 공개 배포용 APK
+./docs/record-demo.sh demo.webm     # 데모 시나리오 자동 실행·녹화
 ```
 
 ## 7. 프로젝트 구조

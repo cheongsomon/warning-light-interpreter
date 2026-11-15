@@ -33,6 +33,8 @@ data class UiState(
     val nearest: Pair<ServiceCenter, Double>? = null,
     val location: Navigator.Location? = null,
     val message: String? = null,
+    /** 지금 음성으로 읽고 있는 문장 (화면 자막). */
+    val caption: String? = null,
     val showEmergency: Boolean = false,
     val emergencySince: Long? = null,
 ) {
@@ -94,7 +96,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         markAnnounced(top)
         briefingDone = true
-        announcer.speak(text)
+        say(text)
     }
 
     private fun onTopChanged(sorted: List<ActiveWarning>) {
@@ -104,14 +106,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         if (top == null) {
             markAnnounced(null)
-            announcer.speak("켜져 있던 경고가 모두 꺼졌습니다.")
+            say("켜져 있던 경고가 모두 꺼졌습니다.")
             _ui.update { it.copy(showEmergency = false) }
             return
         }
         val severity = PriorityEngine.severityOf(top)
         val escalated = lastAnnouncedSeverity != null && severity.rank > lastAnnouncedSeverity!!.rank
         markAnnounced(top)
-        announcer.speak(buildAnnouncement(top, escalated, sorted.size))
+        say(buildAnnouncement(top, escalated, sorted.size))
+    }
+
+    private var captionJob: kotlinx.coroutines.Job? = null
+
+    /** 음성 안내 + 같은 문장을 화면 자막으로 표시. */
+    private fun say(text: String) {
+        android.util.Log.i("Speech", text)
+        announcer.speak(text)
+        _ui.update { it.copy(caption = text) }
+        captionJob?.cancel()
+        captionJob = viewModelScope.launch {
+            delay(text.length * 150L + 2000L)
+            _ui.update { it.copy(caption = null) }
+        }
     }
 
     private fun markAnnounced(top: ActiveWarning?) {
@@ -121,7 +137,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun repeatCurrent() {
         val top = _ui.value.top ?: return briefing()
-        announcer.speak(buildAnnouncement(top, escalated = false, total = _ui.value.warnings.size))
+        say(buildAnnouncement(top, escalated = false, total = _ui.value.warnings.size))
     }
 
     private fun buildAnnouncement(w: ActiveWarning, escalated: Boolean, total: Int): String {
@@ -164,7 +180,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val nearest = ServiceCenters.nearest(loc.lat, loc.lon, places)
             val msg = navigator.routeTo(nearest.first)
             _ui.update { it.copy(location = loc, nearest = nearest, message = msg) }
-            announcer.speak("가장 가까운 ${kind}는 약 ${"%.1f".format(nearest.second)}킬로미터 거리의 ${nearest.first.name.removeSuffix(" (데모)")}입니다. 길안내를 시작합니다.")
+            say("가장 가까운 ${kind}는 약 ${"%.1f".format(nearest.second)}킬로미터 거리의 ${nearest.first.name.removeSuffix(" (데모)")}입니다. 길안내를 시작합니다.")
         }
     }
 
