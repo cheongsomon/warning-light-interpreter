@@ -125,7 +125,8 @@ class VehicleSdkWarningSource(
 
     private fun refreshVin() = safely("vin") {
         vehicle.getCarInfo().getVINInfo(
-            onComplete = { listener?.onVin(it) },
+            // 에뮬레이터는 "invalid"를 돌려주므로 유효한 17자리 VIN만 사용한다.
+            onComplete = { vin -> listener?.onVin(vin?.takeIf { it.length == 17 }) },
             onFailed = { log("vin", it) },
         )
     }
@@ -147,6 +148,8 @@ class VehicleSdkWarningSource(
 
     private fun applyTelltales(telltales: Telltales) {
         val next = mutableMapOf<WarningId, LampState>()
+        val lit = telltales.telltales.filter { it.state != TelltaleState.OFF }
+        Log.i(TAG, "telltales received: total=${telltales.telltales.size}, lit=${lit.joinToString { "${it.type}:${it.state}" }}")
         for (t in telltales.telltales) {
             val id = TELLTALE_MAP[t.type] ?: continue
             val state = when (t.state) {

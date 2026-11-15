@@ -3,6 +3,8 @@
 
     <!-- Vehicle SDK -->
     <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
+    <!-- Safety 경고등(Telltales) 조회에 필요 (protectionLevel=normal) -->
+    <uses-permission android:name="pleos.car.permission.PRIVATE_CAR_SAFETY" />
     <uses-permission android:name="pleos.car.permission.CAR_TIRES" />
     <uses-permission android:name="pleos.car.permission.CAR_ENERGY" />
     <uses-permission android:name="pleos.car.permission.CAR_INFO" />

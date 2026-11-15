@@ -1,0 +1,125 @@
+# 경고등 통역사 (Warning Light Interpreter)
+
+> 고장 알림은 뜨는데 **"무슨 고장인지, 계속 달려도 되는지"** 모르는 운전자를 위해,
+> 경고가 켜진 순간 그 의미와 주행 지속 여부(제조사 매뉴얼 기준)를 음성으로 알려주고
+> 정비소 길안내·긴급출동까지 이어주는 Pleos Connect 인포테인먼트 앱입니다.
+
+📺 **데모 영상**: (링크 예정)  
+📦 **APK**: [Releases](../../releases)
+
+---
+
+## 1. 문제 정의
+
+차량은 이미 고장 알림을 띄워 줍니다. 문제는 그다음입니다.
+
+- **이게 무슨 고장인가?** 아이콘과 짧은 문구만으로는 어떤 문제인지, 얼마나 심각한지 알기 어렵습니다.
+- **계속 달려도 되나?** 지금 세워야 하는지, 목적지까지 가서 정비소에 들러도 되는지 판단할 수 없습니다.
+- 같은 엔진 경고등이라도 **점등과 점멸은 대응이 다릅니다.** 매뉴얼은 글러브박스 속에 있어서 주행 중에는 읽을 수 없습니다.
+
+그 결과 운전자는 주행 중 스마트폰으로 검색하거나, 위험한 경고를 무시하거나, 정보성 경고에 과하게 놀랍니다.
+
+## 2. 3단계 흐름
+
+```mermaid
+flowchart LR
+    A[차량 경고등 신호<br/>Vehicle SDK · Safety Telltales] --> B[우선순위 엔진<br/>최고 심각도 선택<br/>점멸 시 승격]
+    S[시뮬레이션 패널<br/>SIM 표시] --> B
+    B --> C{① 해석<br/>TTS 음성 안내}
+    C --> D[② 행동 안내<br/>계속 달려도 되나요?]
+    D -->|즉시 정차 · 적색| E[③ 긴급출동 화면<br/>위치·경고·시각·차량 요약<br/>원터치 호출]
+    D -->|서행 주행 가능 · 황색| F[③ 가까운 블루핸즈<br/>NaviHelper 길안내]
+    D -->|주행 계속 가능 · 청색| G[다음 정차 시 확인]
+```
+
+| 심각도 | 화면 문구 (주행 지속 여부) | 예시 | 연결 |
+|---|---|---|---|
+| 🔴 STOP_NOW | **즉시 정차** | 브레이크, 엔진오일 압력, 엔진 과열, 엔진 경고등 **점멸** | 긴급출동 화면 |
+| 🟡 SERVICE_SOON | **서행 주행 가능 · 오늘 중 정비** | 엔진 경고등 점등, 타이어 공기압, 에어백, ABS | 가까운 블루핸즈 길안내 |
+| 🔵 INFO | **주행 계속 가능** | 연료 부족(남은 주행가능거리 안내), 워셔액 부족 | — |
+
+시동(앱 시작) 시에는 **차량 상태 브리핑**으로 현재 켜진 경고를 한 문장으로 요약합니다.
+
+## 3. 사용한 Pleos SDK / API
+
+| SDK | 버전 | 사용 API | 용도 |
+|---|---|---|---|
+| Vehicle | 2.3.2 | `Safety.checkTelltalesCapabilities`, `getTelltalesInfo`, `registerTelltales` | 경고등 목록 (종류 + OFF/ON/**BLINK**) 실시간 구독 |
+| | | `Safety.check/registerBrakeFluidLevelState`, `EngineOilLevelState`, `LowWasherFluidWaringState` | 브레이크액·엔진오일 레벨, 워셔액 부족 |
+| | | `Odometer.getRangeRemainingDistance` | 연료 부족 시 남은 주행가능거리 안내 |
+| | | `CarInfo.getVINInfo` | 긴급출동 화면 차량 정보 |
+| TextToSpeech | 3.3.1 | `TextToSpeech(context, Mode.HYBRID)`, `initialize`, `registerApp`, `speak`, `stop` | 해석·행동 지침 음성 안내 |
+| NaviHelper | 3.0.5 | `initialize`, `getCurrentLocationInfo`, `requestRoute(RouteInfo)` | 현재 위치 기준 최단 거리 정비소 길안내 |
+
+## 4. 설계 원칙
+
+1. **진단하지 않는다.** 앱은 고장을 판정하지 않고 *제조사 매뉴얼 기준 안내*만 전달합니다.
+2. **클러스터를 대체·반박하지 않는다.** 계기판 경고 표시를 보완하는 QM 수준 인포테인먼트 앱입니다.
+3. **최고 심각도 우선.** 복수 경고가 동시에 켜지면 가장 위급한 경고 기준으로 안내하고, 더 위급한 경고가 들어오면 진행 중인 안내를 끊고 전환합니다.
+4. **점등/점멸 구분.** SDK `TelltaleState.BLINK`를 받아 엔진 경고등 점멸 시 즉시 정차 단계로 승격합니다.
+5. **주행 중 조작 최소화.** 음성 우선, 큰 글씨, 화면당 핵심 버튼 1개.
+6. **정직한 표시.** 시뮬레이션으로 발생한 경고는 화면에 `SIM`, 실제 차량 신호는 `차량 신호`로 표시합니다. 음성 엔진(Pleos TTS / Android TTS 대체)도 화면에 표시합니다.
+
+## 5. 실제 SDK 연동 범위 vs 시뮬레이션 범위
+
+<!-- 에뮬레이터 검증 결과로 갱신 -->
+| 기능 | 구현 | Pleos Connect Emulator 2.1.0 검증 결과 |
+|---|---|---|
+| 경고등 수신 (Safety Telltales) | Vehicle SDK 실연동 | 확인 예정 |
+| 브레이크액·엔진오일·워셔액 상태 | Vehicle SDK 실연동 | 확인 예정 |
+| 남은 주행가능거리 / VIN | Vehicle SDK 실연동 | 확인 예정 |
+| 데모 시나리오의 경고 발생 | 시뮬레이션 패널 (`SIM` 표시) | 데모 영상은 시뮬레이션 입력 사용 |
+| 음성 안내 | Pleos TTS (실패 시 Android TTS 자동 대체) | 확인 예정 |
+| 정비소 길안내 | NaviHelper `requestRoute` 실연동 | 확인 예정 |
+| 정비소 목록 | **데모용 고정 데이터** (판교·분당 4곳) | 실서비스 시 정비망 API 연동 |
+| 긴급출동 호출 | 다이얼러 열기(`ACTION_DIAL`)까지 | 실서비스 시 긴급출동 시스템 연동 |
+| 경고 문구 | 일반적인 매뉴얼 권고 기반 초안 | 실서비스 시 차종별 매뉴얼로 확정 |
+
+## 6. 빌드·실행
+
+### 요구 사항
+- JDK 17, Android SDK 35, Apple Silicon Mac 기준 검증
+- Pleos Connect Emulator 2.1.0 (Android 14 / API 34, Automotive)
+
+### 에뮬레이터
+1. Android Studio `SDK Manager > SDK Update Sites`에 추가  
+   `https://nexus-playground.pleos.ai/repository/raw-releases/connect-avd/2.x/crp-arm64-sys-img.xml` (Mac)
+2. `Pleos Connect v2.1.0 APIs` 시스템 이미지(API 34) 설치
+3. Device Manager에서 Automotive > Pleos Connect AVD 생성, **Boot option = Cold boot** (Quick boot면 VHAL이 동작하지 않음), RAM 4GB
+4. 에뮬레이터 2.1.0부터는 CRN 주입이 필요 없습니다.
+
+### 비밀값
+`local.properties`(커밋 제외)에 Pleos Playground 프로젝트의 TTS 등록 정보를 넣습니다.
+```properties
+pleos.clientId=<Client ID>
+pleos.clientSecret=<Client Secret>
+```
+값이 없으면 Pleos TTS 온디바이스 합성 또는 Android TTS로 동작합니다.
+
+### 빌드·설치
+```bash
+./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:testDebugUnitTest   # 우선순위 엔진 단위 테스트
+```
+
+## 7. 프로젝트 구조
+
+```
+app/src/main/java/ai/pleos/warninglight/
+├── data/        Warning.kt (심각도·경고 모델), WarningCatalog.kt (경고 → 안내 문구)
+├── engine/      PriorityEngine.kt (최고 심각도 선택, 점멸 승격)
+├── source/      WarningHub (입력 통합), VehicleSdkWarningSource (Vehicle SDK), SimulatedWarningSource
+├── voice/       Announcer.kt (Pleos TTS, Android TTS 대체)
+├── navi/        Navigator.kt (NaviHelper), ServiceCenters.kt (데모 정비소·긴급출동 번호)
+└── ui/          MainScreen.kt (경고 카드·긴급출동 화면·시뮬레이션 패널)
+```
+
+## 8. 향후 확장
+
+- **정비망 실시간 API**: 영업 여부·대기시간 확인, 방문 예약
+- **긴급출동·보험사 연동**: 위치·경고·차량 정보 자동 전송으로 접수 시간 단축
+- **차종별 매뉴얼 연동**: 차종에 맞는 문구와 대응을 OTA로 업데이트
+- **주행/정차 맥락**: 기어(P단) 상태에 따라 주행 중 음성만, 정차 시 상세 화면
+- **음성 질의**: "이 경고 무슨 뜻이야?"를 STT·LLM으로 대화형 안내
+- **실차 검증**: 경고등 신호 타이밍·점멸 판별을 실차에서 검증
