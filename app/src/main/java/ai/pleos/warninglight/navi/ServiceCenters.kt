@@ -28,8 +28,15 @@ object ServiceCenters {
     const val DEFAULT_LAT = 37.4005
     const val DEFAULT_LON = 127.1055
 
-    fun nearest(lat: Double, lon: Double): Pair<ServiceCenter, Double> =
-        demo.map { it to distanceKm(lat, lon, it.latitude, it.longitude) }.minBy { it.second }
+    /** 데모용 고정 주유소 데이터. 실서비스에서는 주유소 검색 API로 대체한다. */
+    val gasStations = listOf(
+        ServiceCenter("판교 주유소 (데모)", 37.3985, 127.1120, "경기 성남시 분당구 판교 일대"),
+        ServiceCenter("백현 주유소 (데모)", 37.3890, 127.1010, "경기 성남시 분당구 백현동 일대"),
+        ServiceCenter("시흥동 주유소 (데모)", 37.4170, 127.0985, "경기 성남시 수정구 시흥동 일대"),
+    )
+
+    fun nearest(lat: Double, lon: Double, places: List<ServiceCenter> = demo): Pair<ServiceCenter, Double> =
+        places.map { it to distanceKm(lat, lon, it.latitude, it.longitude) }.minBy { it.second }
 
     fun distanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val r = 6371.0

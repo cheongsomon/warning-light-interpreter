@@ -171,6 +171,7 @@ private fun WarningCard(vm: MainViewModel, w: ActiveWarning, state: UiState) {
             when (info.nextActionFor(w.state)) {
                 NextAction.EMERGENCY -> BigButton("긴급출동 호출", Palette.red, Color.White, Modifier.weight(1f), vm::openEmergency)
                 NextAction.SERVICE_CENTER -> BigButton("가까운 블루핸즈 길안내", Palette.amber, Color(0xFF1A1300), Modifier.weight(1f), vm::findNearestAndRoute)
+                NextAction.GAS_STATION -> BigButton("가까운 주유소 길안내", Palette.blue, Color.White, Modifier.weight(1f), vm::findNearestGasStation)
                 NextAction.NONE -> BigButton("다시 듣기", Palette.blue, Color.White, Modifier.weight(1f), vm::repeatCurrent)
             }
             if (info.nextActionFor(w.state) != NextAction.NONE) {

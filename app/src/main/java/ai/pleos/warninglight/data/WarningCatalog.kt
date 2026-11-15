@@ -109,7 +109,7 @@ object WarningCatalog {
             name = "연료 부족",
             meaning = "연료가 얼마 남지 않았다는 신호입니다.",
             severity = INFO,
-            action = "가까운 주유소에서 연료를 보충하세요.",
+            action = "아래 버튼으로 가까운 주유소 길안내를 받을 수 있습니다.",
         ),
         WarningInfo(
             id = WarningId.WASHER_FLUID,

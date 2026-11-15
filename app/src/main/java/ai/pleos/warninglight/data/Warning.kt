@@ -14,7 +14,7 @@ enum class LampState { ON, BLINK }
 enum class Origin { VEHICLE, SIMULATION }
 
 /** 안내 후 연결할 다음 행동. */
-enum class NextAction { NONE, SERVICE_CENTER, EMERGENCY }
+enum class NextAction { NONE, SERVICE_CENTER, GAS_STATION, EMERGENCY }
 
 /** 앱이 다루는 경고 종류. SDK의 경고등(Telltale) 또는 개별 상태 신호에서 만들어진다. */
 enum class WarningId {
@@ -62,7 +62,7 @@ data class WarningInfo(
     fun actionFor(state: LampState): String =
         if (state == LampState.BLINK) blinkAction ?: action else action
 
-    fun nextActionFor(state: LampState): NextAction = when (severityFor(state)) {
+    fun nextActionFor(state: LampState): NextAction = if (id == WarningId.LOW_FUEL) NextAction.GAS_STATION else when (severityFor(state)) {
         Severity.STOP_NOW -> NextAction.EMERGENCY
         Severity.SERVICE_SOON -> NextAction.SERVICE_CENTER
         Severity.INFO -> NextAction.NONE

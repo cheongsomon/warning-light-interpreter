@@ -11,7 +11,9 @@ val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-fun secret(key: String) = "\"${localProps.getProperty(key, "")}\""
+// 공개 배포용 APK(-PpublicBuild)에는 비밀값을 넣지 않는다.
+val publicBuild = project.hasProperty("publicBuild")
+fun secret(key: String) = if (publicBuild) "\"\"" else "\"${localProps.getProperty(key, "")}\""
 
 android {
     namespace = "ai.pleos.warninglight"

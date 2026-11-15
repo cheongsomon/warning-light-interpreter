@@ -155,12 +155,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------- 연결 (정비소 / 긴급출동) ----------------
 
-    fun findNearestAndRoute() {
+    fun findNearestAndRoute() = routeToNearest(ServiceCenters.demo, "정비소")
+
+    fun findNearestGasStation() = routeToNearest(ServiceCenters.gasStations, "주유소")
+
+    private fun routeToNearest(places: List<ServiceCenter>, kind: String) {
         navigator.currentLocation { loc ->
-            val nearest = ServiceCenters.nearest(loc.lat, loc.lon)
+            val nearest = ServiceCenters.nearest(loc.lat, loc.lon, places)
             val msg = navigator.routeTo(nearest.first)
             _ui.update { it.copy(location = loc, nearest = nearest, message = msg) }
-            announcer.speak("가장 가까운 정비소는 약 ${"%.1f".format(nearest.second)}킬로미터 거리의 ${nearest.first.name.removeSuffix(" (데모)")}입니다. 길안내를 시작합니다.")
+            announcer.speak("가장 가까운 ${kind}는 약 ${"%.1f".format(nearest.second)}킬로미터 거리의 ${nearest.first.name.removeSuffix(" (데모)")}입니다. 길안내를 시작합니다.")
         }
     }
 
